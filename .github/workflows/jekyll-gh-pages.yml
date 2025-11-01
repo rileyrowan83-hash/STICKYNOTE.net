@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Mini Racer 3D</title>
+<style>
+body {
+  margin: 0;
+  overflow: hidden;
+  background: black;
+  color: white;
+  font-family: sans-serif;
+  text-align: center;
+}
+#hud {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 20px;
+  z-index: 10;
+  color: cyan;
+}
+#result {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 32px;
+  color: yellow;
+  display: none;
+}
+canvas {
+  width: 100vw;
+  height: 100vh;
+  background: radial-gradient(#003,#000);
+}
+</style>
+</head>
+<body>
+<div id="hud">Lap: <span id="lap">1</span>/3</div>
+<div id="result"></div>
+<canvas id="game"></canvas>
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+canvas.width = innerWidth;
+canvas.height = innerHeight;
+
+const trackRadius = 2000;
+const lapsToWin = 3;
+let finished = false;
+
+function makeRacer(color, name, speed) {
+  return {
+    name, color,
+    angle: 0,
+    lap: 1,
+    progress: 0,
+    speed,
+    x: 0,
+    y: 0,
+    finished: false,
+    time: 0
+  };
+}
+
+const racers = [
+  makeRacer("lime", "You", 7.0),
+  makeRacer("red", "AI-1", 6.7),
+  makeRacer("blue", "AI-2", 6.8),
+  makeRacer("orange", "AI-3", 6.6)
+];
+
+let steer = 0;
+window.addEventListener("deviceorientation", e => {
+  if (e.gamma != null) steer = e.gamma / 45; // tilt to steer
+});
+window.addEventListener("touchstart", e => steer = (e.touches[0].clientX < canvas.width/2 ? -0.8 : 0.8));
+window.addEventListener("touchend", () => steer = 0);
+window.addEventListener("keydown", e => {
+  if (e.key === "ArrowLeft") steer = -0.8;
+  if (e.key === "ArrowRight") steer = 0.8;
+});
+window.addEventListener("keyup", () => steer = 0);
+
+function updateRacers(dt) {
+  racers.forEach((r,i)=>{
+    if (r.finished) return;
+    if (r.name === "You") r.angle += r.speed * dt * (1 + steer*0.2);
+    else r.angle += r.speed * dt * (1 + (Math.random()-0.5)*0.05);
+    if (r.angle >= Math.PI*2) {
+      r.angle -= Math.PI*2;
+      r.lap++;
+      if (r.lap > lapsToWin) {
+        r.finished = true;
+        r.time = totalTime;
+      }
+    }
+    r.x = Math.cos(r.angle) * trackRadius;
+    r.y = Math.sin(r.angle) * trackRadius;
+  });
+}
+
+let totalTime = 0;
+function drawScene() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.save();
+  const me = racers[0];
+  const viewAngle = -me.angle + Math.PI/2;
+  ctx.translate(canvas.width/2, canvas.height*0.7);
+  ctx.rotate(viewAngle);
+
+  // track (simple circle)
+  ctx.strokeStyle = "#555";
+  ctx.lineWidth = 400;
+  ctx.beginPath();
+  ctx.arc(0,0,trackRadius,0,Math.PI*2);
+  ctx.stroke();
+
+  // racers
+  racers.forEach((r)=>{
+    ctx.save();
+    ctx.fillStyle = r.color;
+    ctx.beginPath();
+    ctx.arc(r.x,r.y,40,0,Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  });
+  ctx.restore();
+}
+
+function showResult() {
+  const sorted = [...racers].sort((a,b)=>a.time-b.time);
+  let text = "";
+  sorted.forEach((r,i)=>{
+    text += `${i+1}. ${r.name} ${r.name==="You"?"(You)":""}<br>`;
+  });
+  const pos = sorted.findIndex(r=>r.name==="You")+1;
+  document.getElementById("result").innerHTML =
+    (pos===1?"🏆 WINNER!<br>":"") + text;
+  document.getElementById("result").style.display = "block";
+}
+
+function loop(timestamp) {
+  if (!last) last = timestamp;
+  const dt = (timestamp - last) / 1000;
+  last = timestamp;
+  if (!finished) {
+    totalTime += dt;
+    updateRacers(dt);
+    drawScene();
+    document.getElementById("lap").innerText = racers[0].lap;
+    if (racers.every(r=>r.finished)) {
+      finished = true;
+      showResult();
+    }
+  }
+  requestAnimationFrame(loop);
+}
+
+let last = 0;
+loop();
+</script>
+</body>
+</html>
