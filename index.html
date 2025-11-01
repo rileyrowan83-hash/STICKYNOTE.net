@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Neon Rush</title>
+<style>
+  body {
+    margin: 0;
+    overflow: hidden;
+    background: linear-gradient(180deg,#001f3f,#000);
+    touch-action: manipulation;
+  }
+  canvas {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+  }
+  #msg {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: #0ff;
+    font-family: sans-serif;
+    font-size: 24px;
+    user-select: none;
+  }
+</style>
+</head>
+<body>
+<div id="msg">Tap to jump!</div>
+<canvas id="game"></canvas>
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+canvas.width = innerWidth;
+canvas.height = innerHeight;
+
+let groundY = canvas.height * 0.8;
+let player = { x: 80, y: groundY-40, size: 40, dy: 0, gravity: 0.7, jump: -12, onGround: true };
+let scrollSpeed = 6;
+let obstacles = [];
+let gameOver = false;
+let score = 0;
+
+function reset() {
+  obstacles = [];
+  player.y = groundY - player.size;
+  player.dy = 0;
+  player.onGround = true;
+  score = 0;
+  gameOver = false;
+}
+
+function spawnObstacle() {
+  const height = 40 + Math.random() * 40;
+  obstacles.push({ x: canvas.width, y: groundY - height, w: 30, h: height });
+}
+
+let spawnTimer = 0;
+
+function update() {
+  if (gameOver) return;
+
+  player.dy += player.gravity;
+  player.y += player.dy;
+  if (player.y + player.size >= groundY) {
+    player.y = groundY - player.size;
+    player.dy = 0;
+    player.onGround = true;
+  }
+
+  obstacles.forEach(o => o.x -= scrollSpeed);
+  obstacles = obstacles.filter(o => o.x + o.w > 0);
+
+  spawnTimer--;
+  if (spawnTimer <= 0) {
+    spawnObstacle();
+    spawnTimer = 60 + Math.random() * 80;
+  }
+
+  // Collision
+  for (let o of obstacles) {
+    if (
+      player.x < o.x + o.w &&
+      player.x + player.size > o.x &&
+      player.y < o.y + o.h &&
+      player.y + player.size > o.y
+    ) {
+      gameOver = true;
+      document.getElementById("msg").innerText = "Game Over! Tap to Restart";
+    }
+  }
+
+  if (!gameOver) score++;
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // background pulse
+  const t = Date.now() / 400;
+  const bg = Math.floor(40 + 30 * Math.sin(t));
+  ctx.fillStyle = `rgb(0,${bg},${bg*3})`;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // ground
+  ctx.fillStyle = "#00ffff";
+  ctx.fillRect(0, groundY, canvas.width, canvas.height - groundY);
+
+  // player
+  ctx.fillStyle = "#ff00ff";
+  ctx.fillRect(player.x, player.y, player.size, player.size);
+
+  // obstacles
+  ctx.fillStyle = "#ff0000";
+  obstacles.forEach(o => ctx.fillRect(o.x, o.y, o.w, o.h));
+
+  // score
+  ctx.fillStyle = "#fff";
+  ctx.font = "20px monospace";
+  ctx.fillText("Score: " + score, 20, 30);
+}
+
+function loop() {
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+function jump() {
+  if (gameOver) {
+    reset();
+    document.getElementById("msg").innerText = "Tap to jump!";
+    return;
+  }
+  if (player.onGround) {
+    player.dy = player.jump;
+    player.onGround = false;
+  }
+}
+
+canvas.addEventListener("touchstart", jump);
+canvas.addEventListener("mousedown", jump);
+window.addEventListener("resize", () => {
+  canvas.width = innerWidth;
+  canvas.height = innerHeight;
+  groundY = canvas.height * 0.8;
+});
+
+loop();
+</script>
+</body>
+</html>
